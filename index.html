@@ -147,7 +147,7 @@
   #exploreView.on{display:block}
   #glCanvas{position:absolute;inset:0;width:100%;height:100%;display:block}
   #exploreTop{
-    position:absolute;top:14px;left:14px;z-index:5;display:flex;gap:10px;align-items:center;
+    position:absolute;top:14px;left:14px;z-index:8;display:flex;gap:10px;align-items:center;
   }
   #backBtn{
     background:rgba(32,36,43,.9);border:1px solid var(--brass);color:var(--chalk);border-radius:3px;
@@ -201,6 +201,25 @@
     color:#4a3f26;font-size:17px;cursor:pointer;line-height:1;
   }
   #zoomCtrl button:hover{background:#fff}
+
+  /* ---------- exhibit slide (2a) ---------- */
+  #slideLayer{position:absolute;inset:0;z-index:7;display:none}
+  #slideLayer.on{display:block}
+  #slideDim{position:absolute;inset:0}
+  #slideCard{position:absolute;border-radius:2px;box-shadow:0 26px 70px rgba(0,0,0,.7)}
+  #slideCard .sBtn{cursor:pointer;background:none;border:none;font-size:11px;letter-spacing:.12em;text-transform:uppercase;padding:0;font-family:var(--sans)}
+  #slideCard .sBtn:hover{text-decoration:underline}
+
+  /* ---------- artifact form + slide appearance controls (2c) ---------- */
+  .kindGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+  .kindBtn{background:#22262d;border:1px solid #454b55;border-radius:3px;padding:8px 6px;cursor:pointer;color:var(--muted);font-size:11px;letter-spacing:.05em;text-align:center}
+  .kindBtn.sel{border-color:var(--brass-bright);color:var(--chalk)}
+  .kindBtn:hover{border-color:var(--brass)}
+  .segRow{display:flex;border:1px solid #454b55;border-radius:3px;overflow:hidden}
+  .segRow button{flex:1;background:transparent;border:none;color:var(--muted);padding:8px 0;cursor:pointer;font-size:11px;letter-spacing:.06em;text-transform:uppercase;border-right:1px solid #454b55;font-family:var(--sans)}
+  .segRow button:last-child{border-right:none}
+  .segRow button.sel{background:var(--brass);color:#191509}
+  .segRow button:not(.sel):hover{color:var(--chalk)}
 
   #routeHud{
     position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:5;display:none;
@@ -380,9 +399,9 @@
       <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14"/><path d="M4 15 L9.5 10 L13 13.5 L15.8 11 L20 15"/><circle cx="9" cy="8.6" r="0.6"/></svg>
       <span class="tip">Hang a picture · click near a wall</span>
     </button>
-    <button class="tool" data-tool="statue" aria-label="Place a statue">
+    <button class="tool" data-tool="statue" aria-label="Place an artifact">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="6.2" r="2.4"/><path d="M9.6 9.4 C9 12 9.8 13.6 10.4 15 L13.6 15 C14.2 13.6 15 12 14.4 9.4"/><path d="M7.5 19.5 L16.5 19.5 L15.5 15.8 L8.5 15.8 Z"/></svg>
-      <span class="tip">Place a statue · click inside a room</span>
+      <span class="tip">Place an artifact · click inside a room</span>
     </button>
     <button class="tool" data-tool="floortext" aria-label="Write on the floor">
       <svg viewBox="0 0 24 24"><path d="M5 19 C7 15 9 8 12 5 C12.8 6.4 12.2 9 11 12"/><path d="M9.5 14.5 C11 13.5 13.5 13 15 13.6 C13 15 12.5 17 14 17.6 C15.5 18.2 17.5 17 19 15.5"/></svg>
@@ -396,6 +415,11 @@
     <button class="tool" id="redoBtn" aria-label="Redo">
       <svg viewBox="0 0 24 24"><path d="M15 6 L20 11 L15 16"/><path d="M20 11 H9 a4.5 4.5 0 0 0 0 9 H14"/></svg>
       <span class="tip">Redo · Ctrl+Shift+Z</span>
+    </button>
+    <div class="tool-rule"></div>
+    <button class="tool" id="slideStyleBtn" aria-label="Slide appearance">
+      <svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="13" rx="1"/><path d="M7 9.5 H14"/><path d="M7 12.5 H17"/><path d="M9 21 H15"/></svg>
+      <span class="tip">Slide appearance · styles every exhibit slide</span>
     </button>
   </nav>
 
@@ -423,6 +447,10 @@
     <div id="placardKicker">Exhibit</div>
     <div id="placardTitle"></div>
     <div id="placardBody"></div>
+  </div>
+  <div id="slideLayer">
+    <div id="slideDim"></div>
+    <div id="slideCard"></div>
   </div>
   <div id="routeHud">
     <button id="rPrev" aria-label="Previous stop">‹</button>
@@ -473,10 +501,35 @@ const PAPERS = [
 
 let state = { name:"An Unforgettable Argument", author:"by Your Name · you@example.com", nextId:1, rooms:[], route:[] };
 
+/* ---------- artifact kinds + slide appearance (2a + 2c) ---------- */
+const ARTIFACT_KINDS=[["statue","Statue"],["bust","Bust"],["urn","Amphora"],["tapestry","Tapestry"],["vitrine","Vitrine"],["globe","Globe"],["lectern","Lectern"]];
+function kindName(k){ const e=ARTIFACT_KINDS.find(e=>e[0]===k); return e?e[1]:"Statue"; }
+function slideCfg(){
+  state.slide=Object.assign({font:"roman",size:"m",color:"paper",custom:"#e9e3d3",placement:"centre"}, state.slide||{});
+  return state.slide;
+}
+function slideBg(roomColor){
+  const c=slideCfg();
+  return c.color==="paper"?"#e9e3d3": c.color==="ink"?"#20242b": c.color==="oxblood"?"#7a3b33":
+         c.color==="room"?(roomColor||"#e9e3d3"): (c.custom||"#e9e3d3");
+}
+function slideTheme(roomColor){
+  const bg=slideBg(roomColor);
+  let n=parseInt(bg[0]==="#"?bg.slice(1):bg,16); if(isNaN(n)) n=0xe9e3d3;
+  const lum=(0.299*((n>>16)&255)+0.587*((n>>8)&255)+0.114*(n&255))/255;
+  if(lum>0.55) return {bg, kicker:"#8a7443", title:"#33291a", body:"#3f3625", rule:"#b08d3e",
+    border:"rgba(122,101,58,.45)", frame:"#b8ab8c", nav:"#8a5a2c", hint:"#8a7443", dot:"#8a7443", dotFill:"#b08d3e", dotFillB:"#6a5424"};
+  return {bg, kicker:"#d3ae62", title:"#f1ede1", body:"#cfd2d8", rule:"#d3ae62",
+    border:"rgba(211,174,98,.35)", frame:"#6a5c40", nav:"#d3ae62", hint:"#b9a97e", dot:"#8a7a58", dotFill:"#d3ae62", dotFillB:"#8a6f36"};
+}
+const SLIDE_SIZES={ s:{kick:9.5,title:30,body:14,bullet:13.5,width:540,pad:"32px 38px 26px"},
+                    m:{kick:10.5,title:38,body:16,bullet:15,width:620,pad:"38px 46px 30px"},
+                    l:{kick:11.5,title:46,body:18,bullet:16.5,width:700,pad:"44px 52px 34px"} };
+
 /* ---------- undo / redo ---------- */
 const undoStack=[], redoStack=[];
 let editTag=null;
-function snapshot(){ return JSON.stringify({nextId:state.nextId, rooms:state.rooms, route:state.route}); }
+function snapshot(){ return JSON.stringify({nextId:state.nextId, rooms:state.rooms, route:state.route, slide:state.slide}); }
 function pushUndo(){
   undoStack.push(snapshot());
   if(undoStack.length>60) undoStack.shift();
@@ -492,7 +545,7 @@ function commitUndo(before){
 function beginEdit(tag){ if(tag!==editTag){ pushUndo(); editTag=tag; } }
 function restoreSnap(json){
   const d=JSON.parse(json);
-  state.nextId=d.nextId; state.rooms=d.rooms; state.route=d.route||[];
+  state.nextId=d.nextId; state.rooms=d.rooms; state.route=d.route||[]; if(d.slide) state.slide=d.slide;
   selection=null; renderPanel(); draw(); updateHint();
 }
 function doUndo(){ if(!undoStack.length){ toast("Nothing to undo"); return; } redoStack.push(snapshot()); restoreSnap(undoStack.pop()); editTag=null; }
@@ -546,9 +599,9 @@ function loadSample(){
     title:"The Evidence",
     body:"Supporting data lives here. Follow the golden beacon — the numbered route is the order of your talk." };
   gallery.features.push(p1, p2);
-  const s2 = { id:uid(), type:"statue", x:3, y:2,
+  const s2 = { id:uid(), type:"statue", kind:"bust", x:3, y:2,
     title:"The Closing Thought",
-    body:"End the walk in this quiet room. A statue makes a good conclusion — something solid to leave in the audience's mind." };
+    body:"End the walk in this quiet room. A bust makes a good conclusion — a face to leave in the audience's mind.\n- Return to the opening image — the loop closes\n- One sentence per room, walked in order\n- End on the ask, then hold the pause" };
   study.features.push(s2);
   state.rooms.push(atrium, gallery, study);
   state.route = [s1.id, p1.id, p2.id, s2.id];
@@ -1103,8 +1156,8 @@ function placeFeature(tool, wp){
     const nw = nearestWall(r, wp);
     f = { id:uid(), type:"picture", wall:nw.side, t:nw.t, title:"Untitled picture", body:"" };
   } else if(tool==="statue"){
-    f = { id:uid(), type:"statue", x:clamp(wp.x-r.x,0.45,r.w-0.45), y:clamp(wp.y-r.y,0.45,r.h-0.45),
-          title:"Untitled statue", body:"" };
+    f = { id:uid(), type:"statue", kind:"statue", x:clamp(wp.x-r.x,0.45,r.w-0.45), y:clamp(wp.y-r.y,0.45,r.h-0.45),
+          title:"Untitled artifact", body:"" };
   } else {
     f = { id:uid(), type:"floortext", x:clamp(wp.x-r.x,0.45,r.w-0.45), y:clamp(wp.y-r.y,0.45,r.h-0.45),
           text:"Write here" };
@@ -1192,7 +1245,7 @@ function updateHint(){
       ? "Drag on the paper to draw your first room · scroll to zoom, hold Space to pan"
       : "Drag empty paper for a room · click anything to edit · scroll to zoom · Space-drag to pan · Ctrl+Z undoes",
     picture:"Click near a wall inside a room to hang a picture",
-    statue:"Click a spot inside a room to place a statue",
+    statue:"Click a spot inside a room to place an artifact — choose its form in the panel",
     floortext:"Click a spot inside a room to write on the floorboards"
   };
   hintBar.textContent = hints[activeTool];
@@ -1203,7 +1256,10 @@ const panel = document.getElementById("panel");
 
 function renderPanel(){
   panel.classList.toggle("open", !!selection);
+  const ssb=document.getElementById("slideStyleBtn");
+  if(ssb) ssb.classList.toggle("active", !!selection && selection.kind==="slide");
   if(!selection){ panel.innerHTML = helpPanel(); return; }
+  if(selection.kind==="slide"){ renderSlidePanel(); return; }
 
   if(selection.kind==="room"){
     const r=roomById(selection.id);
@@ -1271,7 +1327,7 @@ function renderPanel(){
       <button class="danger" id="pfDel">Remove writing</button>`;
     panel.querySelector("#pfText").addEventListener("input", e=>{ beginEdit("ft"+f.id); f.text=e.target.value; draw(); });
   } else {
-    const noun = f.type==="picture" ? "Picture" : "Statue";
+    const noun = f.type==="picture" ? "Picture" : kindName(f.kind||"statue");
     const where = f.type==="picture" ? "Hangs on a wall — drag it to move" : "Stands on the floor — drag it to move";
     const idx = routeIds().indexOf(f.id);
     const rlen = state.route.length;
@@ -1282,6 +1338,13 @@ function renderPanel(){
         <div class="imgRow">
           <button class="hbtn" id="pfImg">${f.img?"Replace image":"Upload image"}</button>
           ${f.img?`<button class="hbtn" id="pfImgRm">Remove image</button>`:""}
+        </div>
+      </div>` : "";
+    const kindField = f.type==="statue" ? `
+      <div class="field">
+        <label>Artifact form</label>
+        <div class="kindGrid">
+          ${ARTIFACT_KINDS.map(k=>`<button class="kindBtn ${((f.kind||"statue")===k[0])?"sel":""}" data-k="${k[0]}">${k[1]}</button>`).join("")}
         </div>
       </div>` : "";
     const routeField = `
@@ -1307,10 +1370,14 @@ function renderPanel(){
         <label for="pfBody">Presentation text</label>
         <textarea id="pfBody">${esc(f.body)}</textarea>
       </div>
+      ${kindField}
       ${imgField}
       ${routeField}
       <div class="panel-help"><p>In Explore mode, walk up to this ${noun.toLowerCase()} and its placard appears. The golden beacon guides you along the numbered route.</p></div>
       <button class="danger" id="pfDel">Remove ${noun.toLowerCase()}</button>`;
+    panel.querySelectorAll(".kindBtn").forEach(b=>b.addEventListener("click", ()=>{
+      const bf=snapshot(); f.kind=b.dataset.k; commitUndo(bf); renderPanel(); draw();
+    }));
     panel.querySelector("#pfTitle").addEventListener("input", e=>{ beginEdit("t"+f.id); f.title=e.target.value; });
     panel.querySelector("#pfBody").addEventListener("input", e=>{ beginEdit("b"+f.id); f.body=e.target.value; });
     const imgBtn=panel.querySelector("#pfImg");
@@ -1333,6 +1400,82 @@ function renderPanel(){
   });
 }
 
+function renderSlidePanel(){
+  const c=slideCfg();
+  const th=slideTheme("#8a9b84");
+  const pv=SLIDE_SIZES[c.size]||SLIDE_SIZES.m;
+  const titleStyle = c.font==="modern" ? "font-family:var(--sans);font-weight:600" : "font-family:var(--serif);font-style:italic";
+  const sw=(id,bg)=>`<div class="swatch ${c.color===id?"sel":""}" data-sc="${id}" style="background:${bg}"></div>`;
+  panel.innerHTML = `
+    <h2>Slide appearance</h2>
+    <div class="sub">Applies to every exhibit slide</div>
+    <div class="field">
+      <label>Typeface</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <button class="kindBtn ${c.font==="roman"?"sel":""}" data-sf="roman" style="padding:10px 8px">
+          <div style="font-family:var(--serif);font-style:italic;font-size:22px;line-height:1;color:${c.font==="roman"?"#f1ede1":"#9aa0ab"}">Aa</div>
+          <div style="font-size:10px;letter-spacing:.08em;margin-top:6px;text-transform:uppercase">Roman</div>
+        </button>
+        <button class="kindBtn ${c.font==="modern"?"sel":""}" data-sf="modern" style="padding:10px 8px">
+          <div style="font-family:var(--sans);font-weight:600;font-size:22px;line-height:1;color:${c.font==="modern"?"#f1ede1":"#9aa0ab"}">Aa</div>
+          <div style="font-size:10px;letter-spacing:.08em;margin-top:6px;text-transform:uppercase">Modern</div>
+        </button>
+      </div>
+    </div>
+    <div class="field">
+      <label>Text size</label>
+      <div class="segRow">
+        <button data-ss="s" class="${c.size==="s"?"sel":""}" style="font-size:11px;text-transform:none">Aa</button>
+        <button data-ss="m" class="${c.size==="m"?"sel":""}" style="font-size:13px;font-weight:600;text-transform:none">Aa</button>
+        <button data-ss="l" class="${c.size==="l"?"sel":""}" style="font-size:16px;text-transform:none">Aa</button>
+      </div>
+      <div style="font-size:10.5px;color:var(--muted);margin-top:6px;text-align:center">Small · Medium · Large — title and body scale together</div>
+    </div>
+    <div class="field">
+      <label>Slide colour</label>
+      <div class="swatches">
+        ${sw("paper","#e9e3d3")}${sw("ink","#20242b")}${sw("oxblood","#7a3b33")}${sw("room","linear-gradient(135deg,#8a9b84 50%,#33556b 50%)")}
+      </div>
+      <div style="display:flex;gap:10px;font-size:10.5px;color:var(--muted);margin-top:6px">
+        <span style="flex:1;text-align:center">Paper</span><span style="flex:1;text-align:center">Ink</span><span style="flex:1;text-align:center">Oxblood</span><span style="flex:1;text-align:center">Room's own</span>
+      </div>
+      <div class="customColorRow">
+        <input type="color" id="scCustom" value="${c.custom}">
+        <span>Custom colour${c.color==="custom"?" — in use":""}</span>
+      </div>
+    </div>
+    <div class="field">
+      <label>Placement</label>
+      <div class="segRow" style="border-color:var(--brass)">
+        <button data-sp="centre" class="${c.placement==="centre"?"sel":""}">Centre</button>
+        <button data-sp="lower" class="${c.placement==="lower"?"sel":""}">Lower third</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>Preview</label>
+      <div style="background:${th.bg};border:1px solid ${th.frame};border-radius:2px;padding:16px 18px 13px;position:relative">
+        <div style="position:absolute;inset:5px;border:1px solid ${th.border};pointer-events:none"></div>
+        <div style="font-size:8px;letter-spacing:.24em;text-transform:uppercase;color:${th.kicker};margin-bottom:5px">Stop 4 of 4 · The Study</div>
+        <div style="${titleStyle};font-size:${Math.round(pv.title*0.45)}px;color:${th.title};line-height:1.15;margin-bottom:6px">The Closing Thought</div>
+        <div style="width:26px;height:1.5px;background:${th.rule};margin-bottom:7px"></div>
+        <div style="font-size:${Math.round(pv.body*0.62)}px;line-height:1.55;color:${th.body}">End the walk in this quiet room. A bust makes a good conclusion…</div>
+      </div>
+      <div class="panel-help" style="margin-top:12px"><p>In Explore, each route stop opens as a slide over the room. Lines starting with <em>-&nbsp;</em> in the presentation text become bullet points.</p></div>
+    </div>`;
+  const set=(patch)=>{ const b=snapshot(); Object.assign(slideCfg(),patch); commitUndo(b); renderSlidePanel(); };
+  panel.querySelectorAll("[data-sf]").forEach(b=>b.addEventListener("click",()=>set({font:b.dataset.sf})));
+  panel.querySelectorAll("[data-ss]").forEach(b=>b.addEventListener("click",()=>set({size:b.dataset.ss})));
+  panel.querySelectorAll("[data-sp]").forEach(b=>b.addEventListener("click",()=>set({placement:b.dataset.sp})));
+  panel.querySelectorAll("[data-sc]").forEach(s=>s.addEventListener("click",()=>set({color:s.dataset.sc})));
+  const cc=panel.querySelector("#scCustom");
+  cc.addEventListener("input",e=>{ beginEdit("slidecustom"); Object.assign(slideCfg(),{color:"custom",custom:e.target.value}); });
+  cc.addEventListener("change",()=>renderSlidePanel());
+}
+document.getElementById("slideStyleBtn").addEventListener("click", ()=>{
+  selection = (selection && selection.kind==="slide") ? null : {kind:"slide"};
+  renderPanel(); draw();
+});
+
 function helpPanel(){
   const rooms=state.rooms.length;
   const feats=state.rooms.reduce((n,r)=>n+r.features.length,0);
@@ -1343,7 +1486,7 @@ function helpPanel(){
     <div class="sub">How to build a palace</div>
     <div class="panel-help">
       <p><em>Draw rooms.</em> Drag on the paper. Draw a new room touching an old one and a doorway appears by itself. Scroll to zoom, hold Space to pan, Ctrl+Z to undo.</p>
-      <p><em>Furnish them.</em> Hang pictures (you can upload real images onto them), raise statues, and write on the floor. Give every room its own wall colour and wallpaper — damask, stripes, trellis and more.</p>
+      <p><em>Furnish them.</em> Hang pictures (you can upload real images onto them), raise artifacts — statue, bust, amphora, tapestry, vitrine, globe or lectern — and write on the floor. Give every room its own wall colour and wallpaper — damask, stripes, trellis and more.</p>
       <p><em>Set the route.</em> New pictures and statues join the numbered talk route automatically — reorder the stops from any exhibit's panel.</p>
       <p><em>Walk it.</em> In Explore, golden arrows on the floorboards point the way. Press N and you're walked briskly to the next exhibit — the route is your talk.</p>
     </div>
@@ -1376,7 +1519,7 @@ document.addEventListener("keydown", ev=>{
     return;
   }
   if(ev.key==="Delete" || ev.key==="Backspace"){
-    if(!selection) return;
+    if(!selection || selection.kind==="slide") return;
     const b=snapshot();
     if(selection.kind==="room"){
       state.rooms = state.rooms.filter(r=>r.id!==selection.id);
@@ -1468,7 +1611,7 @@ function switchMode(m){
     document.getElementById("designView").style.display="none";
     document.getElementById("exploreHint").textContent = isTouch
       ? "Drag to look · hold ▲ to walk" + (routeIds().length? " · › walks you to the next stop":"")
-      : "Click to look around · W A S D to walk" + (routeIds().length? " · N walks you to the next stop, B back":"") + " · Esc releases the mouse";
+      : "Click to look around · W A S D to walk" + (routeIds().length? " · N opens the next stop as a slide, B back":"") + " · Esc releases the mouse";
     startExplore();
   } else {
     mode="design";
@@ -1567,12 +1710,16 @@ function wallpaperCanvas(style, color){
     // dado rail
     g.fillStyle="rgba(255,255,255,.28)"; g.fillRect(0,dado-9,512,7);
     g.fillStyle="rgba(0,0,0,.30)";       g.fillRect(0,dado+1,512,4);
-    // recessed panels below the rail, one per metre
+    // recessed panels below the rail, one per metre — and upper field panels
     for(let px=0;px<512;px+=256){
       g.strokeStyle="rgba(0,0,0,.32)"; g.lineWidth=3;
       g.strokeRect(px+30, dado+34, 196, 768-dado-70);
       g.strokeStyle="rgba(255,255,255,.22)"; g.lineWidth=2;
       g.strokeRect(px+35, dado+39, 186, 768-dado-80);
+      g.strokeStyle="rgba(0,0,0,.20)"; g.lineWidth=3;
+      g.strokeRect(px+30, 44, 196, dado-88);
+      g.strokeStyle="rgba(255,255,255,.14)"; g.lineWidth=2;
+      g.strokeRect(px+35, 49, 186, dado-98);
     }
     // skirting
     g.fillStyle="rgba(0,0,0,.35)"; g.fillRect(0,768-16,512,16);
@@ -1680,6 +1827,362 @@ function floorTextTexture(text){
   return tex;
 }
 
+/* =====================================================================
+   ARTIFACT & ARCHITECTURE LIBRARY — from the gallery redesign.
+   Same budget: Lambert materials, procedural canvas textures,
+   gradient-plane contact shadows. No shadow maps.
+===================================================================== */
+const ART=(function(){
+  const COL={stone:0xd8d2c4,stoneDk:0xb2ab9a,brass:0xb08d3e,brassHi:0xd3ae62,wood:0x8a6a42,woodDk:0x4e3a22,oxide:0x7a3b33,velvet:0x5e2c27};
+  function lam(c,o){ return new THREE.MeshLambertMaterial(Object.assign({color:c},o||{})); }
+  function mbasic(o){ return new THREE.MeshBasicMaterial(o); }
+  function ctex(w,h,fn){ const c=document.createElement("canvas"); c.width=w; c.height=h; fn(c.getContext("2d"),w,h); return new THREE.CanvasTexture(c); }
+  function lathe(pts,seg,m){ return new THREE.Mesh(new THREE.LatheGeometry(pts.map(p=>new THREE.Vector2(p[0],p[1])),seg||28),m); }
+  function box(w,h,d,m){ return new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m); }
+  function cyl(rt,rb,h,seg,m){ return new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,seg||18),m); }
+  function sph(r,m,ws,hs){ return new THREE.Mesh(new THREE.SphereGeometry(r,ws||20,hs||14),m); }
+  function at(mesh,x,y,z){ mesh.position.set(x,y,z); return mesh; }
+
+  let cache={};
+  function cached(key,make){ if(!cache[key]) cache[key]=make(); return cache[key]; }
+
+  function contactShadow(r,op){
+    const o=(op===undefined?0.34:op);
+    const t=cached("sh"+o, ()=>ctex(128,128,g=>{
+      const gr=g.createRadialGradient(64,64,6,64,64,62);
+      gr.addColorStop(0,"rgba(0,0,0,"+o+")");
+      gr.addColorStop(1,"rgba(0,0,0,0)");
+      g.fillStyle=gr; g.fillRect(0,0,128,128);
+    }));
+    const m=new THREE.Mesh(new THREE.PlaneGeometry(r*2,r*2), mbasic({map:t,transparent:true,depthWrite:false}));
+    m.rotation.x=-Math.PI/2; m.position.y=0.006; m.renderOrder=1;
+    return m;
+  }
+
+  /* ---------- procedural textures (cached per explore session) ---------- */
+  function marbleTex(){ return cached("marble", ()=>ctex(256,256,g=>{
+    g.fillStyle="#d8d2c4"; g.fillRect(0,0,256,256);
+    let seed=7;
+    const rnd=()=>{ seed=(seed*1664525+1013904223)%4294967296; return seed/4294967296; };
+    for(let i=0;i<14;i++){
+      g.strokeStyle=`rgba(120,114,98,${0.06+rnd()*0.10})`;
+      g.lineWidth=0.8+rnd()*1.6;
+      g.beginPath();
+      let x=rnd()*256, y=rnd()*256;
+      g.moveTo(x,y);
+      for(let s=0;s<5;s++){ x+=rnd()*90-30; y+=rnd()*70-20; g.lineTo(x,y); }
+      g.stroke();
+    }
+    for(let i=0;i<380;i++){
+      g.fillStyle=(i%2)?"rgba(255,255,255,.05)":"rgba(90,84,70,.045)";
+      g.fillRect((i*97)%256,(i*211)%256,2,2);
+    }
+  })); }
+  function fluteTex(){ return cached("flute", ()=>{ const t=ctex(256,64,g=>{
+    for(let x=0;x<256;x+=32){
+      const gr=g.createLinearGradient(x,0,x+32,0);
+      gr.addColorStop(0,"#b9b2a2"); gr.addColorStop(0.25,"#e2dccd"); gr.addColorStop(0.5,"#cfc8b7");
+      gr.addColorStop(0.75,"#a8a08e"); gr.addColorStop(1,"#b9b2a2");
+      g.fillStyle=gr; g.fillRect(x,0,32,64);
+    }
+  }); t.wrapS=THREE.RepeatWrapping; t.repeat.set(3,1); return t; }); }
+  function urnTex(){ return cached("urn", ()=>ctex(256,256,g=>{
+    const gr=g.createLinearGradient(0,0,0,256);
+    gr.addColorStop(0,"#7c4630"); gr.addColorStop(0.5,"#9a5a38"); gr.addColorStop(1,"#6e3d2a");
+    g.fillStyle=gr; g.fillRect(0,0,256,256);
+    g.fillStyle="#241a10"; g.fillRect(0,96,256,54);
+    g.fillStyle="#c9973f";
+    for(let x=0;x<256;x+=24){
+      g.fillRect(x+2,102,2,18); g.fillRect(x+2,102,16,2);
+      g.fillRect(x+16,102,2,12); g.fillRect(x+8,112,10,2);
+      g.fillRect(x+8,108,2,6);
+    }
+    g.fillStyle="#241a10"; g.fillRect(0,158,256,6); g.fillRect(0,88,256,4);
+    for(let x=0;x<256;x+=16){
+      g.save(); g.translate(x+8,136); g.rotate(0.5);
+      g.fillStyle="#c9973f"; g.fillRect(-1,-8,2,16); g.restore();
+    }
+  })); }
+  function tapestryTex(){ return cached("tap", ()=>ctex(384,512,g=>{
+    g.fillStyle="#2e4a5e"; g.fillRect(0,0,384,512);
+    const motif=(cx,cy,s)=>{
+      g.save(); g.translate(cx,cy); g.scale(s,s);
+      g.beginPath(); g.ellipse(0,0,17,27,0,0,Math.PI*2); g.fill();
+      g.beginPath(); g.ellipse(-20,-8,9,19,-0.55,0,Math.PI*2); g.fill();
+      g.beginPath(); g.ellipse(20,-8,9,19,0.55,0,Math.PI*2); g.fill();
+      g.beginPath(); g.ellipse(0,-36,7,13,0,0,Math.PI*2); g.fill();
+      g.beginPath(); g.arc(0,34,5,0,Math.PI*2); g.fill();
+      g.restore();
+    };
+    g.fillStyle="rgba(211,174,98,.30)"; motif(192,160,2.1);
+    g.fillStyle="rgba(211,174,98,.18)"; motif(96,330,1.1); motif(288,330,1.1);
+    g.strokeStyle="#b08d3e"; g.lineWidth=10; g.strokeRect(14,14,356,484);
+    g.strokeStyle="rgba(211,174,98,.5)"; g.lineWidth=2; g.strokeRect(28,28,328,456);
+    g.fillStyle="#b08d3e";
+    for(let x=6;x<384;x+=12) g.fillRect(x,496,4,16);
+  })); }
+  function globeTex(){ return cached("globe", ()=>ctex(512,256,g=>{
+    g.fillStyle="#d9c9a4"; g.fillRect(0,0,512,256);
+    let seed=13;
+    const rnd=()=>{ seed=(seed*1664525+1013904223)%4294967296; return seed/4294967296; };
+    g.fillStyle="#a5875a";
+    for(let i=0;i<9;i++){
+      const cx=rnd()*512, cy=40+rnd()*176;
+      g.beginPath();
+      for(let b=0;b<7;b++){
+        g.moveTo(cx,cy);
+        g.arc(cx+(rnd()*80-40), cy+(rnd()*50-25), 12+rnd()*26, 0, Math.PI*2);
+      }
+      g.fill();
+    }
+    g.strokeStyle="rgba(90,70,40,.28)"; g.lineWidth=1;
+    for(let x=0;x<=512;x+=42){ g.beginPath(); g.moveTo(x,0); g.lineTo(x,256); g.stroke(); }
+    for(let y=0;y<=256;y+=42){ g.beginPath(); g.moveTo(0,y); g.lineTo(512,y); g.stroke(); }
+    g.strokeStyle="rgba(90,60,30,.5)"; g.lineWidth=2;
+    g.beginPath(); g.moveTo(0,128); g.lineTo(512,128); g.stroke();
+  })); }
+  function pageTex(){ return cached("page", ()=>ctex(256,256,g=>{
+    g.fillStyle="#efe8d4"; g.fillRect(0,0,256,256);
+    g.fillStyle="rgba(70,55,30,.55)";
+    for(let col=0;col<2;col++){
+      for(let y=28;y<230;y+=13){
+        let x=22+col*128;
+        while(x<118+col*128){
+          const w=8+((x*7+y*13)%22);
+          g.fillRect(x,y,Math.min(w,118+col*128-x),2.5);
+          x+=w+6;
+        }
+      }
+    }
+    g.strokeStyle="rgba(90,70,40,.5)";
+    g.beginPath(); g.moveTo(128,16); g.lineTo(128,240); g.stroke();
+  })); }
+  function marbleMat(){ return new THREE.MeshLambertMaterial({map:marbleTex()}); }
+
+  /* ---------- artifact builders — each stands on y=0 ---------- */
+  function buildStatue(){
+    const g=new THREE.Group();
+    const mar=marbleMat(), marDk=lam(COL.stoneDk);
+    g.add(at(cyl(0.42,0.46,0.10,8,marDk),0,0.05,0));
+    g.add(at(cyl(0.345,0.385,0.17,8,mar),0,0.185,0));
+    g.add(at(cyl(0.40,0.36,0.05,8,marDk),0,0.295,0));
+    const base=0.32;
+    const robe=lathe([
+      [0.001,0],[0.300,0],[0.295,0.05],[0.235,0.14],[0.205,0.40],
+      [0.170,0.72],[0.140,0.95],[0.122,1.06],[0.160,1.20],[0.182,1.32],
+      [0.128,1.405],[0.058,1.44],[0.052,1.50],[0.001,1.50]
+    ],30,mar);
+    robe.position.y=base; g.add(robe);
+    const sash=new THREE.Mesh(new THREE.TorusGeometry(0.132,0.018,8,26),marDk);
+    sash.rotation.x=Math.PI/2; sash.position.y=base+1.07; g.add(sash);
+    const head=sph(0.115,mar); head.scale.set(0.92,1.10,0.96);
+    head.position.y=base+1.615; head.rotation.x=0.10; g.add(head);
+    const arm=cyl(0.038,0.052,0.50,10,mar);
+    arm.position.set(0.285,base+1.42,0.05);
+    arm.rotation.z=-1.05; arm.rotation.x=-0.12; g.add(arm);
+    const hand=sph(0.052,mar); hand.position.set(0.485,base+1.545,0.075); g.add(hand);
+    const scroll=cyl(0.028,0.028,0.24,10,lam(0xe6dfc9));
+    scroll.position.set(0.50,base+1.60,0.075); scroll.rotation.z=0.35; g.add(scroll);
+    const drape=cyl(0.015,0.06,0.62,8,mar);
+    drape.position.set(-0.175,base+1.02,0.02); drape.rotation.z=0.16; g.add(drape);
+    g.add(contactShadow(0.62));
+    return g;
+  }
+  function buildBust(){
+    const g=new THREE.Group();
+    const mar=marbleMat(), marDk=lam(COL.stoneDk);
+    const flute=new THREE.MeshLambertMaterial({map:fluteTex()});
+    g.add(at(cyl(0.235,0.26,0.07,20,marDk),0,0.035,0));
+    g.add(at(cyl(0.205,0.225,0.06,20,mar),0,0.10,0));
+    g.add(at(new THREE.Mesh(new THREE.CylinderGeometry(0.165,0.185,0.98,24),flute),0,0.62,0));
+    g.add(at(cyl(0.21,0.175,0.06,20,mar),0,1.14,0));
+    g.add(at(box(0.46,0.055,0.46,marDk),0,1.20,0));
+    g.add(at(lathe([[0.001,0],[0.115,0],[0.13,0.02],[0.085,0.05],[0.09,0.11],[0.135,0.14],[0.12,0.16],[0.001,0.16]],20,mar),0,1.227,0));
+    const chest=lathe([
+      [0.001,0],[0.085,0],[0.10,0.03],[0.125,0.10],[0.175,0.17],
+      [0.215,0.225],[0.22,0.26],[0.155,0.285],[0.07,0.295],[0.055,0.30],[0.001,0.30]
+    ],24,mar);
+    chest.scale.z=0.58; chest.position.y=1.387; chest.rotation.y=Math.PI; g.add(chest);
+    g.add(at(cyl(0.055,0.066,0.10,12,mar),0,1.715,0.005));
+    const head=sph(0.105,mar); head.scale.set(0.92,1.05,0.95);
+    head.position.set(0,1.79,0.015); head.rotation.y=0.28; g.add(head);
+    const nose=new THREE.Mesh(new THREE.ConeGeometry(0.022,0.05,8),mar);
+    nose.position.set(0.028,1.782,0.098); nose.rotation.x=Math.PI/2-0.25; nose.rotation.z=-0.28; g.add(nose);
+    g.add(contactShadow(0.42));
+    return g;
+  }
+  function buildUrn(){
+    const g=new THREE.Group();
+    const mar=marbleMat();
+    g.add(at(box(0.52,0.06,0.52,lam(COL.stoneDk)),0,0.03,0));
+    g.add(at(box(0.44,0.46,0.44,mar),0,0.29,0));
+    g.add(at(box(0.50,0.05,0.50,lam(COL.stoneDk)),0,0.545,0));
+    const umat=new THREE.MeshLambertMaterial({map:urnTex()});
+    const body=lathe([
+      [0.001,0],[0.10,0.005],[0.115,0.03],[0.065,0.10],[0.09,0.16],
+      [0.20,0.30],[0.235,0.42],[0.215,0.56],[0.15,0.68],[0.085,0.74],
+      [0.082,0.82],[0.125,0.87],[0.13,0.90],[0.001,0.90]
+    ],30,umat);
+    body.position.y=0.57; g.add(body);
+    for(const s of [-1,1]){
+      const h=new THREE.Mesh(new THREE.TorusGeometry(0.085,0.016,8,20,Math.PI),lam(0x5a3122));
+      h.position.set(s*0.155,0.57+0.62,0);
+      h.rotation.z=s*Math.PI/2;
+      g.add(h);
+    }
+    g.add(at(sph(0.035,lam(0x5a3122)),0,0.57+0.925,0));
+    g.add(contactShadow(0.46));
+    return g;
+  }
+  function buildTapestry(){
+    const g=new THREE.Group();
+    const dk=lam(COL.woodDk);
+    /* freestanding posts so it can stand anywhere in a room */
+    for(const s of [-1,1]){
+      g.add(at(cyl(0.032,0.04,2.06,10,dk), s*0.78,1.03,0));
+      g.add(at(box(0.18,0.05,0.34,dk), s*0.78,0.025,0));
+      g.add(at(sph(0.05,lam(COL.brass)), s*0.78,2.11,0));
+    }
+    const rod=cyl(0.022,0.022,1.56,12,dk);
+    rod.rotation.z=Math.PI/2; rod.position.y=2.02; g.add(rod);
+    const geo=new THREE.PlaneGeometry(1.18,1.58,24,1);
+    const pos=geo.attributes.position;
+    for(let i=0;i<pos.count;i++){ const x=pos.getX(i); pos.setZ(i, Math.sin((x+0.59)/1.18*Math.PI*3)*0.035); }
+    geo.computeVertexNormals();
+    const cloth=new THREE.Mesh(geo,new THREE.MeshLambertMaterial({map:tapestryTex(),side:THREE.DoubleSide}));
+    cloth.position.y=1.23; g.add(cloth);
+    for(let i=-2;i<=2;i++) g.add(at(cyl(0.012,0.012,0.09,8,lam(0x2e4a5e)), i*0.27,2.005,0.01));
+    g.add(contactShadow(0.8,0.22));
+    return g;
+  }
+  function buildVitrine(){
+    const g=new THREE.Group();
+    const wood=lam(COL.woodDk), woodHi=lam(COL.wood);
+    g.add(at(box(0.96,0.05,0.70,wood),0,0.735,0));
+    g.add(at(box(0.86,0.09,0.60,woodHi),0,0.665,0));
+    for(const sx of [-1,1]) for(const sz of [-1,1]){
+      g.add(at(cyl(0.028,0.042,0.62,10,wood),sx*0.40,0.31,sz*0.27));
+    }
+    const glass=box(0.64,0.52,0.46,new THREE.MeshLambertMaterial({color:0xbfd4d8,transparent:true,opacity:0.13,depthWrite:false}));
+    glass.position.y=0.76+0.26; g.add(glass);
+    const edges=new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.BoxGeometry(0.64,0.52,0.46)),
+      new THREE.LineBasicMaterial({color:COL.brassHi,transparent:true,opacity:0.8})
+    );
+    edges.position.y=0.76+0.26; g.add(edges);
+    g.add(at(box(0.40,0.065,0.30,lam(COL.velvet)),0,0.795,0));
+    const chalice=lathe([
+      [0.001,0],[0.065,0],[0.07,0.012],[0.02,0.03],[0.016,0.09],
+      [0.055,0.13],[0.068,0.185],[0.062,0.20],[0.001,0.20]
+    ],20,lam(COL.brassHi,{emissive:0x332200}));
+    chalice.position.y=0.828; g.add(chalice);
+    g.add(contactShadow(0.62,0.28));
+    return g;
+  }
+  function buildGlobe(){
+    const g=new THREE.Group();
+    const wood=lam(COL.woodDk);
+    g.add(at(cyl(0.20,0.24,0.05,20,wood),0,0.025,0));
+    g.add(at(lathe([[0.05,0],[0.075,0.06],[0.038,0.14],[0.06,0.30],[0.035,0.46],[0.07,0.56],[0.045,0.62]],18,wood),0,0.05,0));
+    const globe=sph(0.335,new THREE.MeshLambertMaterial({map:globeTex()}),28,20);
+    globe.position.y=1.02; globe.rotation.z=0.41; globe.rotation.y=0.8; g.add(globe);
+    const mer=new THREE.Mesh(new THREE.TorusGeometry(0.375,0.013,8,40),lam(COL.brass));
+    mer.position.y=1.02; mer.rotation.y=Math.PI/2; mer.rotation.x=0.41; g.add(mer);
+    const arm=cyl(0.016,0.016,0.36,8,lam(COL.brass));
+    arm.position.y=0.80; g.add(arm);
+    g.add(contactShadow(0.40));
+    return g;
+  }
+  function buildLectern(){
+    const g=new THREE.Group();
+    const wood=lam(COL.woodDk), woodHi=lam(COL.wood);
+    g.add(at(cyl(0.24,0.28,0.06,10,wood),0,0.03,0));
+    g.add(at(lathe([[0.055,0],[0.09,0.05],[0.045,0.16],[0.07,0.45],[0.04,0.72],[0.075,0.86],[0.05,0.92]],14,woodHi),0,0.06,0));
+    const desk=box(0.58,0.035,0.44,wood);
+    desk.position.y=1.04; desk.rotation.x=-0.30; g.add(desk);
+    const lip=box(0.58,0.035,0.035,wood);
+    lip.position.set(0,0.985,0.20); lip.rotation.x=-0.30; g.add(lip);
+    const cover=box(0.50,0.016,0.36,lam(COL.oxide));
+    cover.position.set(0,1.075,-0.01); cover.rotation.x=-0.30; g.add(cover);
+    const page=new THREE.MeshLambertMaterial({map:pageTex()});
+    for(const s of [-1,1]){
+      const leaf=box(0.235,0.014,0.34,page);
+      leaf.position.set(s*0.122,1.093,-0.012);
+      leaf.rotation.x=-0.30; leaf.rotation.z=s*0.10;
+      g.add(leaf);
+    }
+    g.add(contactShadow(0.36));
+    return g;
+  }
+
+  /* ---------- architecture: cornice, skirting, arched doorway ---------- */
+  function corniceRun(len,color){
+    const g=new THREE.Group();
+    const m1=lam(color), m2=lam(0xe6e1d3);
+    g.add(at(box(len,0.055,0.055,m2),0,-0.028,0.028));
+    g.add(at(box(len,0.045,0.10,m1),0,-0.078,0.05));
+    g.add(at(box(len,0.035,0.145,m2),0,-0.118,0.072));
+    return g;
+  }
+  function skirtingRun(len,color){
+    const g=new THREE.Group();
+    g.add(at(box(len,0.17,0.045,lam(color)),0,0.085,0.022));
+    g.add(at(box(len,0.035,0.065,lam(0xe6e1d3)),0,0.187,0.032));
+    return g;
+  }
+  function doorArch(d){
+    const g=new THREE.Group();
+    const R=d.w/2, springY=DOOR_H-R;
+    const stone=lam(COL.stone), stoneDk=lam(COL.stoneDk);
+    /* spandrel infill — turns the rectangular gap into a true arch */
+    const shape=new THREE.Shape();
+    shape.moveTo(-R,0); shape.lineTo(-R,R+0.05); shape.lineTo(R,R+0.05); shape.lineTo(R,0);
+    shape.absarc(0,0,R,0,Math.PI,false);
+    const depth=WALL_T*2-0.02;
+    const fill=new THREE.Mesh(new THREE.ExtrudeGeometry(shape,{depth:depth,bevelEnabled:false}),stone);
+    fill.position.set(0,springY,-depth/2); g.add(fill);
+    for(const s of [-1,1]){
+      const trim=new THREE.Mesh(new THREE.TorusGeometry(R,0.045,8,26,Math.PI),stone);
+      trim.position.set(0,springY,s*(WALL_T+0.02)); g.add(trim);
+      const key=box(0.16,0.30,0.10,stoneDk);
+      key.position.set(0,DOOR_H-0.02,s*(WALL_T+0.03)); g.add(key);
+      for(const px of [-1,1]){
+        g.add(at(box(0.10,springY,0.055,stone), px*(R+0.02),springY/2,s*(WALL_T+0.015)));
+        g.add(at(box(0.16,0.06,0.085,stoneDk), px*(R+0.02),springY+0.02,s*(WALL_T+0.015)));
+        g.add(at(box(0.15,0.08,0.08,stoneDk), px*(R+0.02),0.04,s*(WALL_T+0.015)));
+      }
+    }
+    if(d.orient==="v"){ g.rotation.y=Math.PI/2; g.position.set(d.x,0,d.c); }
+    else g.position.set(d.c,0,d.y);
+    return g;
+  }
+
+  const builders={statue:buildStatue,bust:buildBust,urn:buildUrn,tapestry:buildTapestry,vitrine:buildVitrine,globe:buildGlobe,lectern:buildLectern};
+  const eyeY={statue:1.35,bust:1.55,urn:1.15,tapestry:1.35,vitrine:1.0,globe:1.0,lectern:1.05};
+  return {builders,eyeY,corniceRun,skirtingRun,doorArch,reset:function(){cache={};}};
+})();
+
+function buildRoomTrim(r){
+  const cornCol=new THREE.Color(shade(r.color,-0.25));
+  const skirtCol=new THREE.Color(shade(r.color,-0.35));
+  for(const side of ["N","S","W","E"]){
+    const len=edgeLen(r,side);
+    const rotY = side==="N"?0 : side==="S"?Math.PI : side==="W"?Math.PI/2 : -Math.PI/2;
+    const mid=edgePoint(r,side,len/2);
+    const cor=ART.corniceRun(len,cornCol);
+    cor.rotation.y=rotY;
+    cor.position.set(mid.x+mid.nx*WALL_T, WALL_H, mid.y+mid.ny*WALL_T);
+    scene.add(cor);
+    for(const [s,e] of edgeSegments(r,side,doors3)){
+      const p=edgePoint(r,side,(s+e)/2);
+      const sk=ART.skirtingRun(e-s,skirtCol);
+      sk.rotation.y=rotY;
+      sk.position.set(p.x+p.nx*WALL_T, 0, p.y+p.ny*WALL_T);
+      scene.add(sk);
+    }
+  }
+}
+
 /* ---------- scene construction ---------- */
 function startExplore(){
   if(!renderer){
@@ -1700,6 +2203,7 @@ function startExplore(){
 
   doors3 = computeDoorways();
   exhibits = [];
+  ART.reset();
   const wood = woodTexture();
 
   for(const r of state.rooms){
@@ -1729,8 +2233,11 @@ function startExplore(){
     scene.add(lamp);
 
     buildWalls(r);
+    buildRoomTrim(r);
     for(const f of r.features) buildFeature(r,f);
   }
+
+  for(const d of doors3) scene.add(ART.doorArch(d));
 
   buildRoute3D();
 
@@ -1809,8 +2316,89 @@ function updateStopLabel(){
   document.getElementById("routeStep").textContent=
     (arrived?"✓ ":"")+`Stop ${routeIdx+1} of ${routeStops3.length}`;
 }
-document.getElementById("rNext").addEventListener("click", ()=>{ setStop(routeIdx+1); startAutoWalk(); });
-document.getElementById("rPrev").addEventListener("click", ()=>{ setStop(routeIdx-1); startAutoWalk(); });
+document.getElementById("rNext").addEventListener("click", ()=>{ closeSlide(); setStop(routeIdx+1); startAutoWalk(); });
+document.getElementById("rPrev").addEventListener("click", ()=>{ closeSlide(); setStop(routeIdx-1); startAutoWalk(); });
+
+/* ---------- exhibit slides (2a) ---------- */
+const slideLayer=document.getElementById("slideLayer");
+const slideDim=document.getElementById("slideDim");
+const slideCard=document.getElementById("slideCard");
+let slideOpen=false;
+slideDim.addEventListener("click", ()=>closeSlide());
+
+function slideBlocks(body){
+  const out=[]; let list=null;
+  for(const raw of String(body||"").split("\n")){
+    const t=raw.trim();
+    if(/^-\s+/.test(t)){ if(!list){ list=[]; out.push({bullets:list}); } list.push(t.replace(/^-\s+/,"")); }
+    else { list=null; if(t) out.push({para:t}); }
+  }
+  return out;
+}
+function openSlide(){
+  if(mode!=="explore" || !routeStops3.length) return;
+  const s=routeStops3[routeIdx];
+  const cfg=slideCfg(), th=slideTheme(s.roomColor), sz=SLIDE_SIZES[cfg.size]||SLIDE_SIZES.m;
+  const titleFont = cfg.font==="modern" ? "font-family:var(--sans);font-weight:600" : "font-family:var(--serif);font-style:italic";
+  const n=routeStops3.length;
+  const dots = n<=10 ? routeStops3.map((_,i)=> i===routeIdx
+      ? `<div style="width:9px;height:9px;border-radius:50%;background:${th.dotFill};border:1px solid ${th.dotFillB}"></div>`
+      : `<div style="width:7px;height:7px;border-radius:50%;border:1px solid ${th.dot}"></div>`).join("")
+    : `<span style="font-size:11px;color:${th.hint}">${routeIdx+1} / ${n}</span>`;
+  const blocks=slideBlocks(s.body).map(b=> b.para
+    ? `<div style="font-size:${sz.body}px;line-height:1.72;color:${th.body};margin-bottom:14px">${esc(b.para)}</div>`
+    : `<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">${b.bullets.map(x=>
+        `<div style="display:flex;gap:12px;font-size:${sz.bullet}px;line-height:1.55;color:${th.body}"><span style="flex:none;color:${th.rule};font-size:${sz.bullet-2}px;padding-top:2px">◆</span><span>${esc(x)}</span></div>`).join("")}</div>`
+  ).join("");
+  slideCard.innerHTML = `
+    <div style="position:absolute;inset:8px;border:1px solid ${th.border};pointer-events:none"></div>
+    <div style="font-size:${sz.kick}px;letter-spacing:.28em;text-transform:uppercase;color:${th.kicker};margin-bottom:12px">Stop ${routeIdx+1} of ${n}${s.roomLabel?" · "+esc(s.roomLabel):""}</div>
+    <div style="${titleFont};font-size:${sz.title}px;color:${th.title};line-height:1.12;margin-bottom:16px">${esc(s.title||"Untitled")}</div>
+    <div style="width:58px;height:2px;background:${th.rule};margin-bottom:20px"></div>
+    ${blocks}
+    <div style="border-top:1px solid ${th.border};margin-top:10px;padding-top:16px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap">
+      <div style="display:flex;gap:8px;align-items:center">${dots}</div>
+      <div style="display:flex;gap:20px;align-items:baseline">
+        <button class="sBtn" id="sPrev" style="color:${th.nav}">‹ Previous</button>
+        <button class="sBtn" id="sNext" style="color:${th.nav}">${routeIdx===n-1?"Finish tour ›":"Next ›"}</button>
+        <span style="font-size:11px;color:${th.hint};font-style:italic;font-family:var(--serif)">Esc — back to the room</span>
+      </div>
+    </div>`;
+  slideCard.style.cssText="";
+  slideCard.style.background=th.bg;
+  slideCard.style.border="1px solid "+th.frame;
+  slideCard.style.padding=sz.pad;
+  slideCard.style.maxHeight="78vh";
+  slideCard.style.overflowY="auto";
+  if(cfg.placement==="lower"){
+    slideCard.style.left="6%"; slideCard.style.right="6%"; slideCard.style.bottom="52px";
+    slideDim.style.background="rgba(10,11,13,.14)";
+  } else {
+    slideCard.style.left="50%"; slideCard.style.top="50%";
+    slideCard.style.transform="translate(-50%,-50%)";
+    slideCard.style.width=Math.min(sz.width, window.innerWidth*0.88)+"px";
+    slideDim.style.background="rgba(10,11,13,.42)";
+  }
+  slideCard.querySelector("#sPrev").addEventListener("click", ()=>slideNav(-1));
+  slideCard.querySelector("#sNext").addEventListener("click", ()=>slideNav(1));
+  slideLayer.classList.add("on");
+  slideOpen=true;
+  if(document.pointerLockElement) document.exitPointerLock();
+  placard.classList.remove("show");
+  document.getElementById("routeHud").style.display="none";
+}
+function closeSlide(){
+  if(!slideOpen) return;
+  slideOpen=false;
+  slideLayer.classList.remove("on");
+  if(mode==="explore" && routeStops3.length) document.getElementById("routeHud").style.display="flex";
+}
+function slideNav(dir){
+  closeSlide();
+  if(dir>0 && routeIdx>=routeStops3.length-1) return;   // finish tour — back to the room
+  if(dir<0 && routeIdx<=0) return;
+  setStop(routeIdx+dir); startAutoWalk();
+}
 
 /* ---------- pathfinding through the doorway graph ---------- */
 function roomAt(x,z){
@@ -1988,31 +2576,19 @@ function buildFeature(r,f){
     grp.position.set(inX, 1.55, inZ);
     grp.rotation.y = f.wall==="N"?0 : f.wall==="S"?Math.PI : f.wall==="W"?Math.PI/2 : -Math.PI/2;
     scene.add(grp);
-    exhibits.push({fid:f.id, x:inX+p.nx*0.3, z:inZ+p.ny*0.3, y:1.5, title:f.title, body:f.body, kind:"Picture"});
+    exhibits.push({fid:f.id, x:inX+p.nx*0.3, z:inZ+p.ny*0.3, y:1.5, title:f.title, body:f.body, kind:"Picture", roomLabel:r.label, roomColor:r.color});
   }
 
   if(f.type==="statue"){
     const gx=r.x+f.x, gz=r.y+f.y;
-    const grp=new THREE.Group();
-    const stone=new THREE.MeshLambertMaterial({color:0xcbc5b8});
-    const stoneDk=new THREE.MeshLambertMaterial({color:0xa9a294});
-
-    const plinth=new THREE.Mesh(new THREE.BoxGeometry(0.62,0.14,0.62), stoneDk);
-    plinth.position.y=0.07; grp.add(plinth);
-    const pedestal=new THREE.Mesh(new THREE.BoxGeometry(0.46,0.78,0.46), stone);
-    pedestal.position.y=0.14+0.39; grp.add(pedestal);
-    const cap=new THREE.Mesh(new THREE.BoxGeometry(0.56,0.08,0.56), stoneDk);
-    cap.position.y=0.96; grp.add(cap);
-    const torso=new THREE.Mesh(new THREE.CylinderGeometry(0.10,0.19,0.42,10), stone);
-    torso.position.y=1.22; grp.add(torso);
-    const head=new THREE.Mesh(new THREE.SphereGeometry(0.13,14,12), stone);
-    head.position.y=1.52; grp.add(head);
-
+    const kind=(f.kind && ART.builders[f.kind]) ? f.kind : "statue";
+    const grp=ART.builders[kind]();
     grp.position.set(gx,0,gz);
     // face the room centre
     grp.rotation.y = Math.atan2((r.x+r.w/2)-gx, (r.y+r.h/2)-gz);
     scene.add(grp);
-    exhibits.push({fid:f.id, x:gx, z:gz, y:1.2, title:f.title, body:f.body, kind:"Statue"});
+    exhibits.push({fid:f.id, x:gx, z:gz, y:ART.eyeY[kind]||1.2, title:f.title, body:f.body,
+                   kind:kindName(kind), roomLabel:r.label, roomColor:r.color});
   }
 
   if(f.type==="floortext"){
@@ -2054,6 +2630,7 @@ function loop(){
   if(keys.KeyA||keys.ArrowLeft) strafe-=1;
   if(keys.KeyD||keys.ArrowRight) strafe+=1;
   fwd+=touchWalk;
+  if(slideOpen){ fwd=0; strafe=0; }
 
   if(autoWalk && (fwd||strafe)) autoWalk=null;   // taking the wheel cancels the guided walk
 
@@ -2076,7 +2653,7 @@ function loop(){
       const d=angDiff(tyaw,yaw);
       yaw += d*Math.min(1,dt*5.2);
       pitch += (0-pitch)*Math.min(1,dt*3);
-      if(Math.abs(d)<0.04) autoWalk=null;        // delivered — hand control back
+      if(Math.abs(d)<0.04){ autoWalk=null; openSlide(); } // delivered — open the slide
     }
   } else if(fwd||strafe){
     const speed=(keys.ShiftLeft||keys.ShiftRight)?4.6:2.9;
@@ -2113,6 +2690,7 @@ function loop(){
 }
 
 function updatePlacard(){
+  if(slideOpen){ placard.classList.remove("show"); return; }
   const p=camera.position;
   const fx=-Math.sin(yaw), fz=-Math.cos(yaw);
   let best=null, bestD=2.6;
@@ -2141,6 +2719,7 @@ function updateRoomTag(){
 }
 
 function stopExplore(){
+  closeSlide();
   if(animId) cancelAnimationFrame(animId);
   animId=null;
   if(document.pointerLockElement) document.exitPointerLock();
@@ -2210,6 +2789,11 @@ for(const [id,val] of [["tpFwd",1],["tpBack",-1]]){
 document.addEventListener("keydown", ev=>{
   if(mode!=="explore") return;
   keys[ev.code]=true;
+  if(slideOpen){
+    if(ev.code==="Escape"){ closeSlide(); return; }
+    if(ev.code==="ArrowRight"||ev.code==="KeyN"){ ev.preventDefault(); slideNav(1); return; }
+    if(ev.code==="ArrowLeft"||ev.code==="KeyB"){ ev.preventDefault(); slideNav(-1); return; }
+  }
   if(ev.code==="KeyN"){ setStop(routeIdx+1); startAutoWalk(); }
   if(ev.code==="KeyB"){ setStop(routeIdx-1); startAutoWalk(); }
   if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].includes(ev.code)) ev.preventDefault();
