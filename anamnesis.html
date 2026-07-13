@@ -29,18 +29,25 @@
     height:56px;display:flex;align-items:center;gap:16px;padding:0 16px;
     background:var(--ink);border-bottom:1px solid #3a4048;position:relative;z-index:20;
   }
-  .brand{display:flex;align-items:baseline;gap:10px;min-width:0}
+  .brand{display:flex;align-items:center;gap:12px;min-width:0}
   .brand .mark{
     font-family:var(--serif);font-size:13px;letter-spacing:.28em;text-transform:uppercase;
     color:var(--brass-bright);white-space:nowrap;
   }
+  .brand-rule{width:1px;height:30px;background:#3a4048;flex-shrink:0}
+  .titleStack{display:flex;flex-direction:column;gap:1px;min-width:0}
   #palaceName{
-    font-family:var(--serif);font-size:19px;font-style:italic;color:var(--chalk);
+    font-family:var(--serif);font-size:18px;font-style:italic;color:var(--chalk);
     background:transparent;border:none;outline:none;min-width:60px;max-width:34vw;
-    border-bottom:1px dashed transparent;padding:2px 0;
+    border-bottom:1px dashed transparent;padding:1px 0;
   }
-  #palaceName:hover,#palaceName:focus{border-bottom-color:var(--brass)}
-  .byline{font-size:11px;color:var(--muted);font-style:italic;white-space:nowrap}
+  #palaceAuthor{
+    font-size:11px;font-style:italic;color:var(--muted);
+    background:transparent;border:none;outline:none;min-width:60px;max-width:34vw;
+    border-bottom:1px dashed transparent;padding:1px 0;
+  }
+  #palaceName:hover,#palaceName:focus,
+  #palaceAuthor:hover,#palaceAuthor:focus{border-bottom-color:var(--brass)}
 
   .papers{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
   .paperBtn{
@@ -226,23 +233,133 @@
     #panel{position:absolute;right:0;top:0;bottom:0;transform:translateX(100%);transition:transform .2s;z-index:15}
     #panel.open{transform:none;box-shadow:-14px 0 30px rgba(0,0,0,.4)}
     .brand .mark{display:none}
-    .byline{display:none}
+    .brand-rule{display:none}
+    #palaceAuthor{font-size:10.5px}
   }
   @media (prefers-reduced-motion: reduce){
     *{transition:none !important}
   }
   button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--brass-bright);outline-offset:1px}
+
+  /* ---------- welcome / title card ---------- */
+  #introOverlay{
+    position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;
+    background:rgba(16,17,20,.74);padding:24px;overflow-y:auto;
+  }
+  #introOverlay.hidden{display:none}
+  #introCard{
+    position:relative;width:min(640px,94vw);max-height:92vh;overflow-y:auto;
+    background:var(--paper);color:#2c2417;border:1px solid #b8ab8c;border-radius:2px;
+    box-shadow:0 22px 64px rgba(0,0,0,.6);padding:38px 44px 30px;
+  }
+  #introCard::before{content:"";position:absolute;inset:9px;border:1px solid rgba(122,101,58,.4);pointer-events:none}
+  #introClose{
+    position:absolute;top:12px;right:14px;z-index:2;background:transparent;border:none;
+    color:#8a7443;font-size:22px;line-height:1;cursor:pointer;padding:4px 6px;
+  }
+  #introClose:hover{color:#5c4a22}
+  .intro-kicker{font-size:11px;letter-spacing:.32em;text-transform:uppercase;color:#8a7443;text-align:center}
+  .intro-title{
+    font-family:var(--serif);font-size:34px;font-style:italic;color:#33291a;text-align:center;
+    margin:6px 0 2px;line-height:1.1;
+  }
+  .intro-sub{font-family:var(--serif);font-size:15px;color:#5a4a30;text-align:center;font-style:italic;margin-bottom:22px}
+  .intro-hr{border:none;border-top:1px solid rgba(122,101,58,.35);margin:20px 0}
+  #introCard h3{
+    font-family:var(--serif);font-size:13px;letter-spacing:.14em;text-transform:uppercase;
+    color:#7a6534;margin:0 0 8px;
+  }
+  #introCard p{font-size:14px;line-height:1.62;color:#3f3625;margin-bottom:12px}
+  #introCard p:last-child{margin-bottom:0}
+  #introCard strong{color:#33291a}
+  #introCard a{color:#8a5a2c;text-decoration:none;border-bottom:1px solid rgba(138,90,44,.4)}
+  #introCard a:hover{border-bottom-color:#8a5a2c}
+  .intro-steps{list-style:none;margin:0 0 4px;padding:0}
+  .intro-steps li{
+    font-size:14px;line-height:1.55;color:#3f3625;padding:5px 0 5px 30px;position:relative;
+  }
+  .intro-steps li b{color:#33291a;font-weight:600}
+  .intro-steps li::before{
+    content:counter(step);counter-increment:step;position:absolute;left:0;top:5px;
+    width:20px;height:20px;border-radius:50%;background:#b08d3e;color:#1d1706;
+    font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;
+  }
+  .intro-steps{counter-reset:step}
+  .intro-cite{font-size:12px;line-height:1.55;color:#6a5c40;font-style:italic;margin:4px 0 0;padding-left:14px;border-left:2px solid rgba(122,101,58,.4)}
+  .intro-note{
+    background:rgba(176,141,62,.14);border:1px solid rgba(122,101,58,.35);border-radius:2px;
+    padding:12px 14px;font-size:13.5px;line-height:1.55;color:#4a3f26;
+  }
+  .intro-note b{color:#33291a}
+  .intro-actions{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:26px;flex-wrap:wrap}
+  #introBegin{
+    background:var(--brass);border:1px solid #6a5424;color:#191509;border-radius:3px;
+    padding:11px 26px;font-family:var(--sans);font-size:13px;letter-spacing:.12em;text-transform:uppercase;
+    cursor:pointer;
+  }
+  #introBegin:hover{background:var(--brass-bright)}
+  .intro-skip{display:flex;align-items:center;gap:7px;font-size:12.5px;color:#6a5c40;cursor:pointer}
+  .intro-skip input{width:15px;height:15px;accent-color:#8a7443;cursor:pointer}
+  .intro-foot{text-align:center;font-size:11.5px;color:#8a7443;margin-top:18px;font-style:italic}
+  @media (max-width:520px){
+    #introCard{padding:30px 22px 24px}
+    .intro-title{font-size:27px}
+  }
 </style>
 </head>
 <body>
 
+<div id="introOverlay" role="dialog" aria-modal="true" aria-labelledby="introHeading">
+  <div id="introCard">
+    <button id="introClose" aria-label="Close welcome guide" title="Close">×</button>
+    <div class="intro-kicker">Anamnesis</div>
+    <div class="intro-title" id="introHeading">Build a Memory Palace</div>
+    <div class="intro-sub">Turn your next talk into a place you can walk through</div>
+
+    <h3>How it works</h3>
+    <ol class="intro-steps">
+      <li><b>Draw rooms</b> on the drafting paper. Draw one against another and a doorway appears on its own.</li>
+      <li><b>Furnish them</b> — hang pictures, raise statues, write on the floor. Each object carries a point of your talk.</li>
+      <li><b>Set the route</b> — every picture and statue joins a numbered path in the order you'll speak.</li>
+      <li><b>Explore</b> — step inside and walk the palace in first person, following the golden trail from point to point.</li>
+    </ol>
+
+    <hr class="intro-hr">
+
+    <h3>Why a palace?</h3>
+    <p><em>Anamnesis</em> (Greek <em>ἀνάμνησις</em>, &ldquo;recollection&rdquo;) revives the ancient <strong>method of loci</strong> — the memory palace of classical orators, who pinned each part of a speech to a place in an imagined building and walked it in the mind's eye. We remember <em>places and journeys</em> far more readily than lists, so anchoring each point of an argument to a room and an object makes a talk genuinely hard to forget.</p>
+    <p class="intro-cite">The technique is first set down in the anonymous <em>Rhetorica ad Herennium</em> (c. 80 BCE) and retold in Cicero's <em>De Oratore</em>; see Frances Yates, <em>The Art of Memory</em> (1966). Modern imaging confirms it works: memory champions rely on spatial routes rather than raw talent (Maguire et al., <em>Nature Neuroscience</em>, 2003), and a few weeks of loci training reshapes ordinary memory networks (Dresler et al., <em>Neuron</em>, 2017).</p>
+
+    <hr class="intro-hr">
+
+    <h3>Make it yours</h3>
+    <div class="intro-note">
+      <p style="margin:0"><b>Please change the title and author.</b> Top-left of the screen you'll find the presentation title (&ldquo;An Unforgettable Argument&rdquo;) and a byline reading <em>by Your Name</em>. Click either to type your own — they're saved with your palace when you export it.</p>
+    </div>
+
+    <h3 style="margin-top:20px">Design &amp; download your own</h3>
+    <p>Everything is built in <strong>Design</strong> mode using the tools down the left edge, then previewed in <strong>Explore</strong>. When you're happy, hit <strong>Export</strong> in the top bar to download your palace as a <code>.json</code> file you can keep, share, or re-open later with <strong>Import</strong>.</p>
+
+    <div class="intro-actions">
+      <label class="intro-skip"><input type="checkbox" id="introDontShow"> Don't show this again</label>
+      <button id="introBegin">Enter the palace →</button>
+    </div>
+
+    <div class="intro-foot">A Creative Commons (CC BY 4.0) artefact by Paul Hendrie · <a href="https://www.aiforhe.com" target="_blank" rel="noopener">www.aiforhe.com</a></div>
+  </div>
+</div>
+
 <header>
   <div class="brand">
     <span class="mark">Anamnesis</span>
-    <input id="palaceName" value="An Unforgettable Argument" aria-label="Palace name" spellcheck="false">
-    <span class="byline">by Paul Hendrie (info@aiforhe.com)</span>
+    <span class="brand-rule"></span>
+    <div class="titleStack">
+      <input id="palaceName" value="An Unforgettable Argument" aria-label="Presentation title" title="Click to rename — make this title your own" spellcheck="false">
+      <input id="palaceAuthor" value="by Your Name · you@example.com" aria-label="Author name and contact" title="Click to add your own name and email" spellcheck="false">
+    </div>
   </div>
   <div class="spacer"></div>
+  <button class="hbtn" id="guideBtn" title="Show the welcome guide">Guide</button>
   <button class="hbtn" id="exportBtn" title="Download this palace as a JSON file">Export</button>
   <button class="hbtn" id="importBtn" title="Load a palace from a JSON file">Import</button>
   <input type="file" id="importFile" accept="application/json,.json" hidden>
@@ -354,7 +471,7 @@ const PAPERS = [
   {id:"panel",   n:"Panelled"}
 ];
 
-let state = { name:"An Unforgettable Argument", nextId:1, rooms:[], route:[] };
+let state = { name:"An Unforgettable Argument", author:"by Your Name · you@example.com", nextId:1, rooms:[], route:[] };
 
 /* ---------- undo / redo ---------- */
 const undoStack=[], redoStack=[];
@@ -413,7 +530,7 @@ function roomById(id){ return state.rooms.find(r=>r.id===id); }
 
 /* ---------- sample palace so Explore works immediately ---------- */
 function loadSample(){
-  state = { name:"An Unforgettable Argument", nextId:1, rooms:[], route:[] };
+  state = { name:"An Unforgettable Argument", author:"by Your Name · you@example.com", nextId:1, rooms:[], route:[] };
   const atrium = { id:uid(), x:42, y:27, w:6, h:5, color:"#8a9b84", label:"Atrium",  paper:"stripe", features:[] };
   const gallery= { id:uid(), x:48, y:27, w:7, h:5, color:"#33556b", label:"Gallery", paper:"damask", features:[] };
   const study  = { id:uid(), x:42, y:32, w:6, h:4, color:"#7a3b33", label:"Study",   paper:"panel",  features:[] };
@@ -436,6 +553,7 @@ function loadSample(){
   state.rooms.push(atrium, gallery, study);
   state.route = [s1.id, p1.id, p2.id, s2.id];
   state.name = "An Unforgettable Argument";
+  state.author = "by Your Name · you@example.com";
 }
 loadSample();
 
@@ -1284,8 +1402,10 @@ function toast(msg){
 
 /* ---------- export / import ---------- */
 document.getElementById("palaceName").addEventListener("input", e=>{ state.name=e.target.value; });
+document.getElementById("palaceAuthor").addEventListener("input", e=>{ state.author=e.target.value; });
 document.getElementById("exportBtn").addEventListener("click", ()=>{
   state.name = document.getElementById("palaceName").value;
+  state.author = document.getElementById("palaceAuthor").value;
   const blob = new Blob([JSON.stringify(state,null,2)], {type:"application/json"});
   const a=document.createElement("a");
   a.href=URL.createObjectURL(blob);
@@ -1306,6 +1426,7 @@ document.getElementById("importFile").addEventListener("change", ev=>{
       state.nextId = state.nextId || 1000;
       state.route = Array.isArray(state.route) ? state.route : [];
       document.getElementById("palaceName").value = state.name||"Imported palace";
+      document.getElementById("palaceAuthor").value = state.author||"by Your Name · you@example.com";
       selection=null; renderPanel(); draw(); updateHint();
       toast("Palace loaded");
     }catch(e){ toast("That file isn't a palace export"); }
@@ -2113,6 +2234,39 @@ window.addEventListener("resize", ()=>{
 resizeCanvas();
 renderPanel();
 updateHint();
+
+/* ---------- welcome / title card ---------- */
+(function(){
+  const overlay=document.getElementById("introOverlay");
+  const begin=document.getElementById("introBegin");
+  const closeX=document.getElementById("introClose");
+  const dontShow=document.getElementById("introDontShow");
+  const SKIP_KEY="anamnesis.hideIntro";
+
+  function lsGet(){ try{ return localStorage.getItem(SKIP_KEY); }catch(e){ return null; } }
+  function lsSet(v){ try{ localStorage.setItem(SKIP_KEY, v); }catch(e){} }
+  function lsDel(){ try{ localStorage.removeItem(SKIP_KEY); }catch(e){} }
+
+  function openIntro(){ overlay.classList.remove("hidden"); begin.focus(); }
+  function closeIntro(){
+    overlay.classList.add("hidden");
+    if(dontShow.checked) lsSet("1"); else lsDel();
+  }
+
+  begin.addEventListener("click", closeIntro);
+  closeX.addEventListener("click", closeIntro);
+  overlay.addEventListener("click", e=>{ if(e.target===overlay) closeIntro(); });
+  document.addEventListener("keydown", e=>{
+    if(e.key==="Escape" && !overlay.classList.contains("hidden")){ e.stopPropagation(); closeIntro(); }
+  }, true);
+
+  // reopen from the header — always fresh, so uncheck the skip box
+  document.getElementById("guideBtn").addEventListener("click", ()=>{
+    dontShow.checked=false; openIntro();
+  });
+
+  if(lsGet()==="1"){ dontShow.checked=true; overlay.classList.add("hidden"); }
+})();
 </script>
 </body>
 </html>
