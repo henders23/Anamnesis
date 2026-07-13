@@ -338,7 +338,7 @@
     </div>
 
     <h3 style="margin-top:20px">Design &amp; download your own</h3>
-    <p>Everything is built in <strong>Design</strong> mode using the tools down the left edge, then previewed in <strong>Explore</strong>. When you're happy, hit <strong>Export</strong> in the top bar to download your palace as a <code>.json</code> file you can keep, share, or re-open later with <strong>Import</strong>.</p>
+    <p>Everything is built in <strong>Design</strong> mode using the tools down the left edge, then previewed in <strong>Explore</strong>. When you're happy, hit <strong>Export</strong> in the top bar to download your palace as a <strong>single, self-contained <code>.html</code> file</strong> — open it in any browser, share it, or present straight from it, no internet required. Re-open it here anytime with <strong>Import</strong> to keep editing.</p>
 
     <div class="intro-actions">
       <label class="intro-skip"><input type="checkbox" id="introDontShow"> Don't show this again</label>
@@ -360,9 +360,9 @@
   </div>
   <div class="spacer"></div>
   <button class="hbtn" id="guideBtn" title="Show the welcome guide">Guide</button>
-  <button class="hbtn" id="exportBtn" title="Download this palace as a JSON file">Export</button>
-  <button class="hbtn" id="importBtn" title="Load a palace from a JSON file">Import</button>
-  <input type="file" id="importFile" accept="application/json,.json" hidden>
+  <button class="hbtn" id="exportBtn" title="Download this palace as a single, self-contained web page">Export</button>
+  <button class="hbtn" id="importBtn" title="Re-open an exported palace (.html or .json) to keep editing">Import</button>
+  <input type="file" id="importFile" accept="text/html,.html,application/json,.json" hidden>
   <div class="seg" role="tablist" aria-label="Mode">
     <button id="modeDesign" class="active" role="tab">Design</button>
     <button id="modeExplore" role="tab">Explore</button>
@@ -556,6 +556,25 @@ function loadSample(){
   state.author = "by Your Name · you@example.com";
 }
 loadSample();
+
+/* If this file was produced by Export, a palace is baked into the page —
+   load it instead of the sample so the export opens straight into it. */
+function applyEmbeddedPalace(){
+  const el=document.getElementById("palaceData");
+  if(!el) return false;
+  try{
+    const data=JSON.parse(el.textContent.trim());
+    if(!Array.isArray(data.rooms)) return false;
+    state=data;
+    state.nextId = state.nextId || 1000;
+    state.route = Array.isArray(state.route) ? state.route : [];
+    const nm=document.getElementById("palaceName"), au=document.getElementById("palaceAuthor");
+    if(nm && state.name)   nm.value = state.name;
+    if(au && state.author) au.value = state.author;
+    return true;
+  }catch(e){ return false; }
+}
+applyEmbeddedPalace();
 
 /* ---------- doorways: computed, never stored ---------- */
 function computeDoorways(){
@@ -1403,33 +1422,102 @@ function toast(msg){
 /* ---------- export / import ---------- */
 document.getElementById("palaceName").addEventListener("input", e=>{ state.name=e.target.value; });
 document.getElementById("palaceAuthor").addEventListener("input", e=>{ state.author=e.target.value; });
-document.getElementById("exportBtn").addEventListener("click", ()=>{
-  state.name = document.getElementById("palaceName").value;
+
+function slugify(s){
+  return (String(s||"").replace(/[^\w\- ]+/g,"").trim().replace(/\s+/g,"-").toLowerCase()) || "memory-palace";
+}
+
+/* Read a palace that was baked into a previously-exported HTML file. */
+function extractPalaceFromHTML(html){
+  const m = html.match(/<script[^>]*id=["']palaceData["'][^>]*>([\s\S]*?)<\/script>/i);
+  if(!m) return null;
+  try{ return JSON.parse(m[1].trim()); }catch(e){ return null; }
+}
+
+/* Build a single, self-contained HTML file that opens straight into this
+   palace — Three.js inlined so Explore works offline, and the palace data
+   baked in so Import can re-open it for editing. */
+async function buildSelfContainedHTML(){
+  state.name   = document.getElementById("palaceName").value;
   state.author = document.getElementById("palaceAuthor").value;
-  const blob = new Blob([JSON.stringify(state,null,2)], {type:"application/json"});
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download=(state.name||"memory-palace").replace(/[^\w\- ]+/g,"").trim().replace(/\s+/g,"-").toLowerCase()+".palace.json";
-  a.click();
-  URL.revokeObjectURL(a.href);
+
+  // Start from the pristine page source; fall back to the live DOM (e.g. file://).
+  let html;
+  try{
+    const res = await fetch(location.href, {cache:"no-store"});
+    if(!res.ok) throw 0;
+    html = await res.text();
+    if(!/id=["']palaceName["']/.test(html)) throw 0;
+  }catch(e){
+    html = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
+  }
+
+  // 1 · Inline Three.js so the file runs with no network (best-effort).
+  const cdnRe = /<script\b[^>]*\bsrc=["'][^"']*three(?:\.min)?\.js["'][^>]*>\s*<\/script>/i;
+  if(cdnRe.test(html) && typeof fetch==="function"){
+    try{
+      const url = html.match(/src=["']([^"']*three(?:\.min)?\.js)["']/i)[1];
+      const js  = await (await fetch(url,{cache:"force-cache"})).text();
+      if(js && js.length>1000){
+        const tag = "<scr"+"ipt>/* three.js (inlined for offline use) */\n"+js+"\n<\/scr"+"ipt>";
+        html = html.replace(cdnRe, ()=>tag);
+      }
+    }catch(e){ /* leave the CDN tag — the file still works while online */ }
+  }
+
+  // 2 · Bake in the palace data (replace any previous copy first).
+  //     Escape "</" so palace text can't terminate the script tag early.
+  const json = JSON.stringify(state).replace(/<\//g,"<\\/");
+  const dataTag = '<scr'+'ipt id="palaceData" type="application/json">\n'+json+'\n<\/scr'+'ipt>';
+  html = html.replace(/<script[^>]*id=["']palaceData["'][^>]*>[\s\S]*?<\/script>\s*/i, "");
+  html = html.replace(/<\/head>/i, ()=>dataTag+"\n</head>");
+
+  // 3 · Name the browser tab after the palace, and make sure the guide shows.
+  const titleTag = "<title>"+esc(state.name||"Anamnesis")+" — Anamnesis</title>";
+  html = html.replace(/<title>[\s\S]*?<\/title>/i, ()=>titleTag);
+  html = html.replace(/(<div id="introOverlay"[^>]*class=")([^"]*)"/i, (m,a,c)=>a+c.replace(/\bhidden\b/,"").trim()+'"');
+
+  return html;
+}
+
+document.getElementById("exportBtn").addEventListener("click", async ()=>{
+  const btn=document.getElementById("exportBtn"), label=btn.textContent;
+  btn.disabled=true; btn.textContent="Exporting…";
+  toast("Preparing a self-contained file…");
+  try{
+    const html = await buildSelfContainedHTML();
+    const blob = new Blob([html], {type:"text/html"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download=slugify(state.name)+".html";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast("Exported a single file you can open, share, or present from");
+  }catch(e){
+    toast("Export failed — please try again");
+  }finally{
+    btn.disabled=false; btn.textContent=label;
+  }
 });
+
 document.getElementById("importBtn").addEventListener("click", ()=>document.getElementById("importFile").click());
 document.getElementById("importFile").addEventListener("change", ev=>{
   const file=ev.target.files[0]; if(!file) return;
   const rd=new FileReader();
   rd.onload=()=>{
-    try{
-      const data=JSON.parse(rd.result);
-      if(!Array.isArray(data.rooms)) throw 0;
-      pushUndo();
-      state=data;
-      state.nextId = state.nextId || 1000;
-      state.route = Array.isArray(state.route) ? state.route : [];
-      document.getElementById("palaceName").value = state.name||"Imported palace";
-      document.getElementById("palaceAuthor").value = state.author||"by Your Name · you@example.com";
-      selection=null; renderPanel(); draw(); updateHint();
-      toast("Palace loaded");
-    }catch(e){ toast("That file isn't a palace export"); }
+    const text=rd.result;
+    let data=null;
+    try{ data=JSON.parse(text); }         // a .json palace
+    catch(e){ data=extractPalaceFromHTML(text); }  // or a self-contained .html export
+    if(!data || !Array.isArray(data.rooms)){ toast("That file isn't a palace export"); return; }
+    pushUndo();
+    state=data;
+    state.nextId = state.nextId || 1000;
+    state.route = Array.isArray(state.route) ? state.route : [];
+    document.getElementById("palaceName").value = state.name||"Imported palace";
+    document.getElementById("palaceAuthor").value = state.author||"by Your Name · you@example.com";
+    selection=null; renderPanel(); draw(); updateHint();
+    toast("Palace loaded");
   };
   rd.readAsText(file);
   ev.target.value="";
