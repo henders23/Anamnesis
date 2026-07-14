@@ -357,7 +357,7 @@
     </div>
 
     <h3 style="margin-top:20px">Design &amp; download your own</h3>
-    <p>Everything is built in <strong>Design</strong> mode using the tools down the left edge, then previewed in <strong>Explore</strong>. When you're happy, hit <strong>Export</strong> in the top bar to download your palace as a <code>.json</code> file you can keep, share, or re-open later with <strong>Import</strong>.</p>
+    <p>Everything is built in <strong>Design</strong> mode using the tools down the left edge, then previewed in <strong>Explore</strong>. When you're happy, hit <strong>Export</strong> in the top bar to download your palace as a self-contained <code>.html</code> file you can keep, share, or simply open in any browser to walk it again — or re-load it here with <strong>Import</strong>.</p>
 
     <div class="intro-actions">
       <label class="intro-skip"><input type="checkbox" id="introDontShow"> Don't show this again</label>
@@ -379,9 +379,9 @@
   </div>
   <div class="spacer"></div>
   <button class="hbtn" id="guideBtn" title="Show the welcome guide">Guide</button>
-  <button class="hbtn" id="exportBtn" title="Download this palace as a JSON file">Export</button>
-  <button class="hbtn" id="importBtn" title="Load a palace from a JSON file">Import</button>
-  <input type="file" id="importFile" accept="application/json,.json" hidden>
+  <button class="hbtn" id="exportBtn" title="Download this palace as a self-contained HTML file">Export</button>
+  <button class="hbtn" id="importBtn" title="Load a palace from an HTML or JSON file">Import</button>
+  <input type="file" id="importFile" accept="text/html,.html,application/json,.json" hidden>
   <div class="seg" role="tablist" aria-label="Mode">
     <button id="modeDesign" class="active" role="tab">Design</button>
     <button id="modeExplore" role="tab">Explore</button>
@@ -1544,15 +1544,49 @@ function toast(msg){
 }
 
 /* ---------- export / import ---------- */
+// Accept both the self-contained HTML export and the legacy .json palace file.
+function parsePalaceFile(text){
+  // Legacy JSON palace.
+  try{ const d=JSON.parse(text); if(d && Array.isArray(d.rooms)) return d; }catch(e){}
+  // HTML export — pull the palace baked into the embed script.
+  try{
+    const dom=new DOMParser().parseFromString(text,"text/html");
+    const s=dom.querySelector("script[data-anamnesis-embed]");
+    if(s){
+      const json=s.textContent.trim().replace(/^window\.__ANAMNESIS_EMBED__\s*=\s*/,"").replace(/;?\s*$/,"");
+      const d=JSON.parse(json);
+      if(d && Array.isArray(d.rooms)) return d;
+    }
+  }catch(e){}
+  return null;
+}
 document.getElementById("palaceName").addEventListener("input", e=>{ state.name=e.target.value; });
 document.getElementById("palaceAuthor").addEventListener("input", e=>{ state.author=e.target.value; });
 document.getElementById("exportBtn").addEventListener("click", ()=>{
   state.name = document.getElementById("palaceName").value;
   state.author = document.getElementById("palaceAuthor").value;
-  const blob = new Blob([JSON.stringify(state,null,2)], {type:"application/json"});
+
+  // Export a self-contained HTML copy of the whole app with this palace baked in,
+  // so opening the file re-opens the fully interactive palace (no import needed).
+  const doc = document.documentElement.cloneNode(true);
+  // Drop any prior embed and transient runtime state from the clone.
+  doc.querySelectorAll("script[data-anamnesis-embed]").forEach(n=>n.remove());
+  // Reflect the saved title/author onto the inputs so they read correctly before JS runs.
+  const nm=doc.querySelector("#palaceName"); if(nm) nm.setAttribute("value", state.name||"");
+  const au=doc.querySelector("#palaceAuthor"); if(au) au.setAttribute("value", state.author||"");
+
+  // Bake the palace data in as a script the app reads on boot. Escape "<" so a
+  // closing script tag inside any text field can't break out of the embed.
+  const embed=document.createElement("script");
+  embed.setAttribute("data-anamnesis-embed","");
+  embed.textContent="window.__ANAMNESIS_EMBED__="+JSON.stringify(state).replace(/</g,"\\u003c")+";";
+  doc.querySelector("head").appendChild(embed);
+
+  const html="<!DOCTYPE html>\n"+doc.outerHTML;
+  const blob = new Blob([html], {type:"text/html"});
   const a=document.createElement("a");
   a.href=URL.createObjectURL(blob);
-  a.download=(state.name||"memory-palace").replace(/[^\w\- ]+/g,"").trim().replace(/\s+/g,"-").toLowerCase()+".palace.json";
+  a.download=(state.name||"memory-palace").replace(/[^\w\- ]+/g,"").trim().replace(/\s+/g,"-").toLowerCase()+".palace.html";
   a.click();
   URL.revokeObjectURL(a.href);
 });
@@ -1562,8 +1596,8 @@ document.getElementById("importFile").addEventListener("change", ev=>{
   const rd=new FileReader();
   rd.onload=()=>{
     try{
-      const data=JSON.parse(rd.result);
-      if(!Array.isArray(data.rooms)) throw 0;
+      const data=parsePalaceFile(rd.result);
+      if(!data || !Array.isArray(data.rooms)) throw 0;
       pushUndo();
       state=data;
       state.nextId = state.nextId || 1000;
@@ -2815,6 +2849,18 @@ window.addEventListener("resize", ()=>{
     camera.updateProjectionMatrix();
   }
 });
+/* ---------- load a palace baked into an HTML export ---------- */
+if(window.__ANAMNESIS_EMBED__ && Array.isArray(window.__ANAMNESIS_EMBED__.rooms)){
+  try{
+    state=window.__ANAMNESIS_EMBED__;
+    state.nextId=state.nextId||1000;
+    state.route=Array.isArray(state.route)?state.route:[];
+    document.getElementById("palaceName").value=state.name||"Imported palace";
+    document.getElementById("palaceAuthor").value=state.author||"by Your Name · you@example.com";
+    selection=null;
+  }catch(e){}
+}
+
 resizeCanvas();
 renderPanel();
 updateHint();
